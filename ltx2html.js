@@ -26,20 +26,20 @@ function CustomGenerator(customArgs, customPrototype) {
         };
     
       return CustomMacros;
-    }())
+      }())
   });
   return generator;
 }
 
 
-function ltx2html(latex, div, generator = basicGenerator) {
+function ltx2html(latex, parentElement, generator = basicGenerator) {
   if (!generator) {
     latexjsScript.addEventListener('load', function () {
-      ltx2html(latex, div);
+      ltx2html(latex, parentElement);
     });
   } else {
     generator.reset();
-    div.innerHTML = '';
+    parentElement.innerHTML = '';
 
     const ltx = `\\documentclass{article}
 
@@ -61,9 +61,12 @@ ${latex}
       return e.message;
     }
 
-    //document.head.appendChild(generator.stylesAndScripts("https://cdn.jsdelivr.net/npm/latex.js@0.12.4/dist/"));
-    div.classList.add('ltx')
-    div.appendChild(generator.domFragment().firstChild);
+    let child = generator.domFragment().firstChild;
+    while (child.innerHTML.indexOf('<br></p>') > -1) {
+      child.innerHTML = child.innerHTML.replace('<br></p>', '<br>&nbsp;</p>');
+    }
+    parentElement.classList.add('ltx');
+    parentElement.appendChild(child);
 
     return null;
   }
