@@ -17,29 +17,35 @@ function CustomGenerator(customArgs, customPrototype) {
           this.g = generator;
         }
     
-        // enumerate
-        // args['enumerate'] = ['V']
-        // prototype['enumerate'] = function() {
-        //   let ol = document.createElement('ol');
-        //   ol.classList.add('list');
-        //   ol.classList.add('dash');
-        //   return [ol];
-        // };
-
-    
       return CustomMacros;
       }())
   });
   return generator;
 }
 
-function removeArgs(latex, command) {
+function removeArgs(latex, command, linesup = 0) {
+  while (latex.indexOf(command+'{') > -1 || latex.indexOf(command+'[') > -1) {
+    let i = latex.indexOf(command+'{') > -1 ? latex.indexOf(command+'{') : latex.indexOf(command+'[');
+    let end = latex.indexOf(command+'{') > -1 ? '}' : ']';
+    let e = latex.indexOf(end, i+command.length),
+        endOfLine = latex.indexOf('\n', i+command.length);
+    if (e == -1 || e > endOfLine) {
+      throw {
+        message: `syntax error: missing end of arguments '${end}'`,
+        line: linesup + latex.substring(0, endOfLine).split('\n').length
+      }
+    }
+    latex = latex.substring(0,i+command.length) + latex.substring(e+1);
+  }
   return latex;
 }
 
 // remove arguments that cannot be processed
 function ltxclean(latex) {
 
+  // clean itemize
+  latex = removeArgs(latex, '\\begin{itemize}');
+  console.log(latex);
 
   // clean enumerate
   var i = 0;
@@ -80,7 +86,8 @@ function ltxclean(latex) {
     
     if (depth == 0) {
       let sublatex = latex.substring(begin, end);
-      latex = latex.substring(0, begin) + removeArgs(sublatex, '\\begin{enumerate}') + latex.substring(end);
+      latex = latex.substring(0, begin) + removeArgs(sublatex, '\\begin{enumerate}',
+        latex.substring(0, begin).split('\n').length - 1)+ latex.substring(end);
     }
   }
   return latex;
@@ -100,6 +107,17 @@ function ltx2html(latex, parentElement, generator = basicGenerator) {
     latex = ltxclean(latex);
 
     // PRE PROCESSING
+
+    // spaces
+    while (latex.indexOf('\\:') > -1) {
+      latex = latex.replace('\\:', '\\,')
+    }
+    while (latex.indexOf('\\;') > -1) {
+      latex = latex.replace('\\;', '\\ ')
+    }
+    while (latex.indexOf('\\!') > -1) {
+      latex = latex.replace('\\!', '')
+    }
 
     // alphabetic enumerate
     let i = 0,
@@ -149,7 +167,7 @@ ${latex}
     }
     catch (e) {
       // return error
-      let line = e.location.start.line > 9 ? e.location.start.line - 9 : 1;
+      let line = e.location.start.line > 9 ? e.location.start.line - 9 : 0;
       throw {
         message: e.message,
         line: line,
