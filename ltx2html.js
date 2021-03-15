@@ -33,8 +33,56 @@ function CustomGenerator(customArgs, customPrototype) {
   return generator;
 }
 
+function removeArgs(latex, command) {
+  return latex;
+}
+
+// remove arguments that cannot be processed
 function ltxclean(latex) {
-  // remove arguments that cannot be processed
+
+
+  // clean enumerate
+  var i = 0;
+  while (latex.indexOf('\\begin{enumerate}', i) > -1) {
+    let begin = latex.indexOf('\\begin{enumerate}', i) + 17;
+    if (latex.indexOf('[', begin) == begin) {
+      let end = latex.indexOf(']', begin),
+          endOfLine = latex.indexOf('\n', begin);
+      if (end == -1 || end > endOfLine) {
+        throw {
+          message: `syntax error: missing end of arguments ']'`,
+          line: latex.substring(0, endOfLine).split('\n').length
+        }
+      }
+      let args = latex.substring(begin+1, end);
+      if (args.indexOf('label=\\alph*)') > -1) {
+        latex = latex.substring(0, begin) + '[label=\\alph*)]' + latex.substring(end+1);
+        begin += 15;
+      } else {
+        latex = latex.substring(0, begin) + latex.substring(end+1);
+      }
+    } 
+
+    let depth = 1;
+    i = begin;
+    while((latex.indexOf('\\begin{enumerate}', i) > -1 || latex.indexOf('\\end{enumerate}', i) > -1) && depth > 0) {
+      let b = latex.indexOf('\\begin{enumerate}', i),
+          e = latex.indexOf('\\end{enumerate}', i);
+      if ((b > -1 && e > -1 && b < e) || (b > -1 && e == -1)) {
+        i = b + 1;
+        depth++;
+      } else {
+        end = e;
+        i = e + 1;
+        depth--;
+      }
+    }
+    
+    if (depth == 0) {
+      let sublatex = latex.substring(begin, end);
+      latex = latex.substring(0, begin) + removeArgs(sublatex, '\\begin{enumerate}') + latex.substring(end);
+    }
+  }
   return latex;
 }
 
@@ -49,21 +97,19 @@ function ltx2html(latex, parentElement, generator = basicGenerator) {
     parentElement.innerHTML = '';
 
     // CLEAN
-    try {
-      latex = ltxclean(latex);
-    } catch (e) {
-      return `${e.message} at line ${e.line}`
-    }
+    latex = ltxclean(latex);
 
     // PRE PROCESSING
-    var i = 0,
+
+    // alphabetic enumerate
+    let i = 0,
         depth = 0,
         alphEnumerate = false;
     while(latex.indexOf('\\begin{enumerate}', i) > -1 || latex.indexOf('\\end{enumerate}', i) > -1) {
       let b = latex.indexOf('\\begin{enumerate}', i),
           e = latex.indexOf('\\end{enumerate}', i);
       if ((b > -1 && e > -1 && b < e) || (b > -1 && e == -1)) {
-        if (depth == 0 && latex.indexOf('[label=\\alph*)]', b) == 17) {
+        if (depth == 0 && latex.indexOf('[label=\\alph*)]', b) == b+17) {
           latex = latex.substring(0, b) + '\\begin{enumerate}\\begin{enumerate}' + latex.substring(b+32);
           alphEnumerate = true;
           i = b + 18;
@@ -72,7 +118,7 @@ function ltx2html(latex, parentElement, generator = basicGenerator) {
           i = b + 1;
         }
         depth++;
-      } else if ((b > -1 && e > -1 && e < b) || (b == -1 && e > -1)) {
+      } else {
         if (depth == 1 && alphEnumerate) {
           latex = latex.substring(0, e) + '\\end{enumerate}' + latex.substring(e);
           alphEnumerate = false;
@@ -103,11 +149,10 @@ ${latex}
     }
     catch (e) {
       // return error
-      let line = e.location.start.line - 9;
-      if (line < 1) {
-        return `${e.message}`;
-      } else {
-        return `${e.message} at line ${line}`;
+      let line = e.location.start.line > 9 ? e.location.start.line - 9 : 1;
+      throw {
+        message: e.message,
+        line: line,
       }
     }
 
