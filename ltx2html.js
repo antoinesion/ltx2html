@@ -17,6 +17,9 @@ function CustomGenerator(customArgs, customPrototype) {
           this.g = generator;
         }
 
+        // CUSTOM MACROS
+
+        // minipage
         args['minipage'] = ['V', 'i?', 'g']
         prototype['minipage'] = function (adjustment, width) {
           width = width.data;
@@ -34,8 +37,17 @@ function CustomGenerator(customArgs, customPrototype) {
           }
           return [div]
         }
+
+        args['fbox'] = ['V', 'g']
+        prototype['fbox'] = function (content) {
+          let div = document.createElement('div');
+          div.classList.add('hbox');
+          div.classList.add('frame');
+          div.appendChild(content);
+          return [div];
+        }
     
-      return CustomMacros;
+        return CustomMacros;
       }())
   });
   return generator;
@@ -123,8 +135,6 @@ function ltx2html(latex, parentElement, generator = basicGenerator) {
       ltx2html(latex, parentElement);
     });
   } else {
-    generator.reset();
-    parentElement.innerHTML = '';
 
     // CLEAN
     latex = ltxclean(latex);
@@ -190,6 +200,7 @@ ${latex}
 \\end{document}`;
 
     // MAIN PROCESSING
+    generator.reset();
     try {
       generator = latexjs.parse(ltx, { generator: generator });
     }
@@ -204,9 +215,10 @@ ${latex}
       }
     }
 
-    // POST PROCESSING
-    // line break at the end paragraphs
     let child = generator.domFragment().firstChild;
+    // POST PROCESSING
+
+    // line break at the end paragraphs
     while (child.innerHTML.includes('<p><br></p>')) {
       child.innerHTML = child.innerHTML.replace('<p><br></p>', '<p>&nbsp;</p>');
     }
@@ -219,8 +231,22 @@ ${latex}
       el.innerHTML = el.innerHTML.replace('(', '');
     }
 
+    // minipage width inside fbox
+    for (minipage of child.getElementsByClassName('minipage')) {
+      let parent = minipage.parentElement;
+      if (parent.classList.contains('hbox')) {
+        if (parent.style.width) {
+          parent.style.width = parent.style.width.slice(0, -1) + minipage.style.width + ')';
+        }
+        else {
+          parent.style.width = 'calc(' + minipage.style.width + ')';
+        }
+        minipage.style.removeProperty('width');
+      }
+    }
 
-    // display
+    // DISPLAY
+    parentElement.innerHTML = '';
     parentElement.classList.add('ltx');
     parentElement.appendChild(child);
   }
