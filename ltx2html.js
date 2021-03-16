@@ -16,6 +16,24 @@ function CustomGenerator(customArgs, customPrototype) {
         function CustomMacros(generator) {
           this.g = generator;
         }
+
+        args['minipage'] = ['V', 'i?', 'g']
+        prototype['minipage'] = function (adjustment, width) {
+          width = width.data;
+
+          let div = document.createElement('div')
+          div.classList.add('minipage');
+          if (width.includes('w')) {
+            div.style.width = parseFloat(width.split('w')[0])*100 + '%';
+          } else {
+            div.style.width = width;
+          }
+
+          if (adjustment) {
+            div.classList.add(adjustment);
+          }
+          return [div]
+        }
     
       return CustomMacros;
       }())
@@ -45,11 +63,10 @@ function ltxclean(latex) {
 
   // clean itemize
   latex = removeArgs(latex, '\\begin{itemize}');
-  console.log(latex);
 
   // clean enumerate
   var i = 0;
-  while (latex.indexOf('\\begin{enumerate}', i) > -1) {
+  while (latex.includes('\\begin{enumerate}', i)) {
     let begin = latex.indexOf('\\begin{enumerate}', i) + 17;
     if (latex.indexOf('[', begin) == begin) {
       let end = latex.indexOf(']', begin),
@@ -61,7 +78,7 @@ function ltxclean(latex) {
         }
       }
       let args = latex.substring(begin+1, end);
-      if (args.indexOf('label=\\alph*)') > -1) {
+      if (args.includes('label=\\alph*)')) {
         latex = latex.substring(0, begin) + '[label=\\alph*)]' + latex.substring(end+1);
         begin += 15;
       } else {
@@ -71,7 +88,7 @@ function ltxclean(latex) {
 
     let depth = 1;
     i = begin;
-    while((latex.indexOf('\\begin{enumerate}', i) > -1 || latex.indexOf('\\end{enumerate}', i) > -1) && depth > 0) {
+    while((latex.includes('\\begin{enumerate}', i) || latex.includes('\\end{enumerate}', i)) && depth > 0) {
       let b = latex.indexOf('\\begin{enumerate}', i),
           e = latex.indexOf('\\end{enumerate}', i);
       if ((b > -1 && e > -1 && b < e) || (b > -1 && e == -1)) {
@@ -90,6 +107,12 @@ function ltxclean(latex) {
         latex.substring(0, begin).split('\n').length - 1)+ latex.substring(end);
     }
   }
+
+  // textwidth
+  while (latex.includes('\\textwidth')) {
+    latex = latex.replace('\\textwidth', '\\linewidth');
+  }
+
   return latex;
 }
 
@@ -109,21 +132,26 @@ function ltx2html(latex, parentElement, generator = basicGenerator) {
     // PRE PROCESSING
 
     // spaces
-    while (latex.indexOf('\\:') > -1) {
-      latex = latex.replace('\\:', '\\,')
+    while (latex.includes('\\:')) {
+      latex = latex.replace('\\:', '\\,');
     }
-    while (latex.indexOf('\\;') > -1) {
-      latex = latex.replace('\\;', '\\ ')
+    while (latex.includes('\\;')) {
+      latex = latex.replace('\\;', '\\ ');
     }
-    while (latex.indexOf('\\!') > -1) {
-      latex = latex.replace('\\!', '')
+    while (latex.includes('\\!')) {
+      latex = latex.replace('\\!', '');
+    }
+
+    // linewidth
+    while (latex.includes('\\linewidth')) {
+      latex = latex.replace('\\linewidth', 'w');
     }
 
     // alphabetic enumerate
     let i = 0,
         depth = 0,
         alphEnumerate = false;
-    while(latex.indexOf('\\begin{enumerate}', i) > -1 || latex.indexOf('\\end{enumerate}', i) > -1) {
+    while(latex.includes('\\begin{enumerate}', i) || latex.includes('\\end{enumerate}', i)) {
       let b = latex.indexOf('\\begin{enumerate}', i),
           e = latex.indexOf('\\end{enumerate}', i);
       if ((b > -1 && e > -1 && b < e) || (b > -1 && e == -1)) {
@@ -166,8 +194,10 @@ ${latex}
       generator = latexjs.parse(ltx, { generator: generator });
     }
     catch (e) {
+      console.log(e);
       // return error
-      let line = e.location.start.line > 9 ? e.location.start.line - 9 : 0;
+      let line = e.location.end.line > 9 ? e.location.end.line - 9 : 0;
+      line = e.location.start.line > 9 ? e.location.start.line - 9 : line;
       throw {
         message: e.message,
         line: line,
@@ -177,7 +207,10 @@ ${latex}
     // POST PROCESSING
     // line break at the end paragraphs
     let child = generator.domFragment().firstChild;
-    while (child.innerHTML.indexOf('<br></p>') > -1) {
+    while (child.innerHTML.includes('<p><br></p>')) {
+      child.innerHTML = child.innerHTML.replace('<p><br></p>', '<p>&nbsp;</p>');
+    }
+    while (child.innerHTML.includes('<br></p>')) {
       child.innerHTML = child.innerHTML.replace('<br></p>', '<br>&nbsp;</p>');
     }
 
