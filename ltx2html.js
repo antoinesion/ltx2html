@@ -24,27 +24,149 @@ function CustomGenerator(customArgs, customPrototype) {
         prototype['minipage'] = function (adjustment, width) {
           width = width.data;
 
-          let div = document.createElement('div')
-          div.classList.add('minipage');
+          let minipage = document.createElement('div')
+          minipage.classList.add('minipage');
           if (width.includes('w')) {
-            div.style.width = parseFloat(width.split('w')[0])*100 + '%';
+            minipage.style.width = parseFloat(width.split('w')[0])*100 + '%';
           } else {
-            div.style.width = width;
+            minipage.style.width = width;
           }
 
           if (adjustment) {
-            div.classList.add(adjustment);
+            minipage.classList.add(adjustment);
           }
-          return [div]
+          return [minipage]
         }
 
+        // fbox
         args['fbox'] = ['V', 'g']
         prototype['fbox'] = function (content) {
-          let div = document.createElement('div');
-          div.classList.add('hbox');
-          div.classList.add('frame');
-          div.appendChild(content);
-          return [div];
+          let fbox = document.createElement('div');
+          fbox.classList.add('hbox');
+          fbox.classList.add('frame');
+          fbox.appendChild(content);
+          return [fbox];
+        }
+
+        // tabular
+        args['tabular'] = ['V', 'hg', 'h']
+        prototype['tabular'] = function (template, content) {
+          let tabular = document.createElement('div');
+          tabular.classList.add('tabular');
+          tabular.style.gridTemplateColumns = '';
+
+          if (!template) {
+            return [tabular]
+          }
+          if (template.childNodes.length > 0) {
+            template = template.childNodes[0].wholeText.replace(' ', '');
+          } else {
+            template = template.data.replace(' ', '');
+          }
+
+          let gridTemplateColumns = '',
+              columns = template;
+          while (columns.includes('|')) {
+            columns = columns.replace('|', '');
+          }
+          tabular.dataset.columns = columns.length;
+
+          for (let i = 0; i < columns.length; i++) {
+            if (columns[i] == 'p') {
+              let e = columns.indexOf('}', i);
+              let width = columns.substring(i+2, e);
+              if (width.includes('w')) {
+                gridTemplateColumns += parseFloat(width.split('w')[0])*100 + '%';
+              } else {
+                gridTemplateColumns += width;
+              }
+              i = e;
+            } else {
+              gridTemplateColumns += 'max-content';
+            }
+            
+            if (i < columns.length - 1) {
+              gridTemplateColumns += ' ';
+            }
+          }
+          tabular.style.gridTemplateColumns = gridTemplateColumns;
+
+          while (template.includes('{')) {
+            let b = template.indexOf('{'),
+                e = template.indexOf('}');
+            template = template.substring(0, b) + template.substring(e+1);
+          }
+
+          tabular.dataset.template = template;
+          let cell = document.createElement('span');
+          cell.classList.add('cell');
+          if (content) {
+            cell.appendChild(content);
+          } else {
+            cell.classList.add('empty');
+          }
+          tabular.appendChild(cell);
+          return [tabular];
+        }
+
+        args['repeatcell'] = ['H', 'n', 'g']
+        prototype['repeatcell'] = function (number, column) {
+          if (!column) {
+            return []
+          }
+          return [column.data.repeat(number)];
+        }
+
+        args['pcell'] = ['H', 'g']
+        prototype['pcell'] = function (length) {
+          if (!length) {
+            return []
+          }
+          length = length.data;
+          return ['p{' + length + '}']
+        }
+
+        // hline
+        args['hline'] = ['V', 'h']
+        prototype['hline'] = function (content) {
+          let cell = document.createElement('span');
+          cell.classList.add('cell');
+          if (content) {
+            cell.appendChild(content);
+          } else {
+            cell.classList.add('empty');
+          }
+          return [document.createElement('hr'), cell];
+
+        }
+
+        // endline
+        args['endline'] = ['V', 'h']
+        prototype['endline'] = function (content) {
+          let endline = document.createElement('span');
+          endline.classList.add('endline');
+
+          let cell = document.createElement('span');
+          cell.classList.add('cell');
+          if (content) {
+            cell.appendChild(content);
+          } else {
+            cell.classList.add('empty');
+          }
+          return [endline, cell];
+        }
+
+        // nextcell
+        args['nextcell'] = ['V', 'h']
+        prototype['nextcell'] = function (content) {
+          let cell = document.createElement('span');
+          cell.classList.add('cell');
+          if (content) {
+            cell.appendChild(content);
+          } else {
+            cell.classList.add('empty');
+          }
+          return [cell];
         }
     
         return CustomMacros;
@@ -186,6 +308,52 @@ function ltx2html(latex, parentElement, generator = basicGenerator) {
       }
     }
 
+    // tabular
+    i = 0;
+    while(latex.includes('\\begin{tabular}{', i)) {
+      let b = latex.indexOf('}{', i)+2;
+      let e = b,
+          stack = 0;
+      while((stack > 0 || latex[e] != '}') && e < latex.length) {
+        if (latex[e] == '{') {
+          stack++;
+        } else if (latex[e] == '}') {
+          stack--;
+        }
+        e++;
+      }
+      if (e == latex.length) {
+        break;
+      }
+      let args = latex.substring(b, e);
+      
+      let j = args.indexOf('p');
+      while (j > -1) {
+        args = args.substring(0, j) + '\\pcell' + args.substring(j+1);
+        j = args.indexOf('p', j+2);
+      }
+      while (args.includes('*')) {
+        args = args.replace('*', '\\repeatcell');
+      }
+
+      latex = latex.substring(0, b) + args + latex.substring(e);
+      i = e;
+    }
+
+    let mathMode = false;
+    for (let i = 0; i < latex.length; i++) {
+      if (latex[i] == '$') {
+        mathMode = !mathMode;
+      }
+      if (!mathMode && latex[i] == '&') {
+        latex = latex.substring(0, i) + '\\nextcell ' + latex.substring(i+1);
+      } else if (i < latex.length - 1) {
+        if (latex[i] == '\\' && latex[i+1] == '\\') {
+          latex = latex.substring(0, i) + '\\endline ' + latex.substring(i+2);
+        }
+      }
+    }
+
     const ltx = `\\documentclass{article}
 
 \\usepackage{comment, multicol}
@@ -205,7 +373,6 @@ ${latex}
       generator = latexjs.parse(ltx, { generator: generator });
     }
     catch (e) {
-      console.log(e);
       // return error
       let line = e.location.end.line > 9 ? e.location.end.line - 9 : 0;
       line = e.location.start.line > 9 ? e.location.start.line - 9 : line;
@@ -216,6 +383,7 @@ ${latex}
     }
 
     let child = generator.domFragment().firstChild;
+    
     // POST PROCESSING
 
     // line break at the end paragraphs
@@ -242,6 +410,65 @@ ${latex}
           parent.style.width = 'calc(' + minipage.style.width + ')';
         }
         minipage.style.removeProperty('width');
+      }
+    }
+
+    // tabular
+    function applyStyle(elements, property, value) {
+      for (el of elements) {
+        el.style.setProperty(property, value);
+      }
+    }
+
+    for (tabular of child.getElementsByClassName('tabular')) {
+      let cells = []
+          col = 0,
+          columns = parseInt(tabular.dataset.columns);
+      
+      if (columns) {
+        while (columns--) cells.push([]);
+
+        for (el of tabular.children) {
+          if (el.classList.contains('cell')) {
+            cells[col].push(el);
+            
+            col++;
+            if (col == cells.length) {
+              col = 0
+            }
+          } else {
+            col = 0
+          }
+        }
+      
+        let template = tabular.dataset.template;
+        col = 0;
+        for (let i = 0; i < template.length; i++) {
+          if (i < template.length - 1 && template[i] == '|' && template[i + 1] == '|') {
+            if (i == 0) {
+              applyStyle(cells[col], 'border-left', 'double black 4px');
+            } else {
+              applyStyle(cells[col-1], 'border-right', 'double black 4px');
+            }
+            i++;
+          }
+          else if (template[i] == '|') {
+            if (i == 0) {
+              applyStyle(cells[col], 'border-left', '1px solid black');
+            } else {
+              applyStyle(cells[col-1], 'border-right', '1px solid black');
+            }
+          } else {
+            if (template[i] == 'c') {
+              applyStyle(cells[col], 'text-align', 'center');
+            } else if (template[i] == 'r') {
+              applyStyle(cells[col], 'text-align', 'right');
+            } else if (template[i] == 'p') {
+              applyStyle(cells[col], 'text-align', 'justify');
+            }
+            col++;
+          }
+        }
       }
     }
 
