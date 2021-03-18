@@ -8,9 +8,10 @@ document.head.appendChild(latexjsScript);
 var basicGenerator;
 
 function createCell(content) {
-  if (content && content.firstChild && content.firstChild.classList && content.firstChild.classList.contains('multicolumn')) {
-    return content.firstChild;
+  if (content && content.classList && content.classList.contains('multicolumn')) {
+    return content;
   }
+  
   let cell = document.createElement('div');
   cell.classList.add('cell');
   if (content) {
@@ -340,14 +341,14 @@ function ltx2html(latex, parentElement, generator = basicGenerator) {
         if (!mathMode) {
           if (latex[i] == '&') {
           latex = latex.substring(0, i) + '}\\nextcell{' + latex.substring(i+1);
-          i--;
+          i-=2;
           } else if (spaces.includes(latex[i]) && (i == 0 || i == latex.length - 1)) {
             latex = latex.substring(0, i) + latex.substring(i+1);
             i--;
           } else if (i < latex.length - 1) {
             if (latex[i] == '\\' && latex[i+1] == '\\') {
               latex = latex.substring(0, i) + '}\\endline{' + latex.substring(i+2);
-              i--;
+              i-=2;
             } else if (latex[i] == '{' && spaces.includes(latex[i+1])) {
               latex = latex.substring(0, i+1) + latex.substring(i+2);
               i--;
@@ -524,6 +525,7 @@ ${latex}
                   message: `syntax error: wrong multicolumn argument '${template}'`
                 }
               }
+              col += c;
             } else {
               cells[col].push(el);
 
