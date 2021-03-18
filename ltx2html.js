@@ -7,6 +7,20 @@ document.head.appendChild(latexjsScript);
 
 var basicGenerator;
 
+function createCell(content) {
+  if (content && content.firstChild && content.firstChild.classList && content.firstChild.classList.contains('multicolumn')) {
+    return content.firstChild;
+  }
+  let cell = document.createElement('div');
+  cell.classList.add('cell');
+  if (content) {
+    cell.appendChild(content);
+  } else {
+    cell.classList.add('empty');
+  }
+  return cell;
+}
+
 function CustomGenerator(customArgs, customPrototype) {
   var generator = new latexjs.HtmlGenerator({
       CustomMacros: (function() {
@@ -98,14 +112,7 @@ function CustomGenerator(customArgs, customPrototype) {
           }
 
           tabular.dataset.template = template;
-          let cell = document.createElement('div');
-          cell.classList.add('cell');
-          if (content) {
-            cell.appendChild(content);
-          } else {
-            cell.classList.add('empty');
-          }
-          tabular.appendChild(cell);
+          tabular.appendChild(createCell(content));
           return [tabular];
         }
 
@@ -129,15 +136,7 @@ function CustomGenerator(customArgs, customPrototype) {
         // hline
         args['hline'] = ['V', 'g']
         prototype['hline'] = function (content) {
-          let cell = document.createElement('div');
-          cell.classList.add('cell');
-          if (content) {
-            cell.appendChild(content);
-          } else {
-            cell.classList.add('empty');
-          }
-          return [document.createElement('hr'), cell];
-
+          return [document.createElement('hr'), createCell(content)];
         }
 
         // endline
@@ -145,27 +144,37 @@ function CustomGenerator(customArgs, customPrototype) {
         prototype['endline'] = function (content) {
           let endline = document.createElement('div');
           endline.classList.add('endline');
-
-          let cell = document.createElement('div');
-          cell.classList.add('cell');
-          if (content) {
-            cell.appendChild(content);
-          } else {
-            cell.classList.add('empty');
-          }
-          return [endline, cell];
+          return [endline, createCell(content)];
         }
 
         // nextcell
         args['nextcell'] = ['V', 'g']
-        prototype['nextcell'] = function (content) {
+        prototype['nextcell'] = function(content) {
+          return [createCell(content)];
+        };
+
+        // multicolumn
+        args['multicolumn'] = ['V', 'n', 'g', 'g']
+        prototype['multicolumn'] = function (number, template, content) {
+          if (!template || !template.data) {
+            throw {
+              message: `syntax error: wrong multicolumn argument '${template}'`
+            }
+          }
+          template = template.data;
+
           let cell = document.createElement('div');
           cell.classList.add('cell');
+          cell.classList.add('multicolumn');
+          cell.dataset.columns = number;
+          cell.dataset.template = template;
+
           if (content) {
             cell.appendChild(content);
           } else {
             cell.classList.add('empty');
           }
+
           return [cell];
         }
     
@@ -307,12 +316,19 @@ function ltx2html(latex, parentElement, generator = basicGenerator) {
     }
 
     // tabular
+    let spaces = [' ', '\n', '\t'];
     function setTabularMacros(latex) {
       let i = 0;
       while (latex.includes('\\hline', i)) {
         let h = latex.indexOf('\\hline', i);
         latex = latex.substring(0,h) + '}\\hline{' + latex.substring(h+6);
         i = h + 2;
+      }
+      i = 0;
+      while (latex.includes('\\cline', i)) {
+        let c = latex.indexOf('\\cline', i);
+        latex = latex.substring(0,c) + '}\\cline{' + latex.substring(c+6);
+        i = c + 2;
       }
 
       let mathMode = false;
@@ -324,15 +340,20 @@ function ltx2html(latex, parentElement, generator = basicGenerator) {
         if (!mathMode) {
           if (latex[i] == '&') {
           latex = latex.substring(0, i) + '}\\nextcell{' + latex.substring(i+1);
-          } else if (latex[i] == '\n' && (i == 0 || i == latex.length - 1)) {
+          i--;
+          } else if (spaces.includes(latex[i]) && (i == 0 || i == latex.length - 1)) {
             latex = latex.substring(0, i) + latex.substring(i+1);
+            i--;
           } else if (i < latex.length - 1) {
             if (latex[i] == '\\' && latex[i+1] == '\\') {
               latex = latex.substring(0, i) + '}\\endline{' + latex.substring(i+2);
-            } else if (latex[i] == '{' && (latex[i+1] === ' ' || latex[i+1] === '\n')) {
+              i--;
+            } else if (latex[i] == '{' && spaces.includes(latex[i+1])) {
               latex = latex.substring(0, i+1) + latex.substring(i+2);
-            } else if ((latex[i+1] === ' ' || latex[i+1] === '\n') && latex[i+1] == '}') {
+              i--;
+            } else if (spaces.includes(latex[i]) && (spaces.includes(latex[i+1]) || latex[i+1] == '}')) {
               latex = latex.substring(0, i) + latex.substring(i+1);
+              i--;
             }
           }
         }
@@ -398,6 +419,7 @@ function ltx2html(latex, parentElement, generator = basicGenerator) {
         }
       }
     }
+    console.log(1, latex);
 
     const ltx = `\\documentclass{article}
 
@@ -473,11 +495,42 @@ ${latex}
 
         for (el of tabular.children) {
           if (el.classList.contains('cell')) {
-            cells[col].push(el);
-            
-            col++;
-            if (col == cells.length) {
-              col = 0
+            if (el.classList.contains('multicolumn')) {
+              let c = parseInt(el.dataset.columns);
+              el.style.gridColumn = (col+1) + '/' + (col + 1 + c);
+
+              let template = el.dataset.template;
+              try {
+                if (col == 0 && template.startsWith('||')) {
+                  el.style.borderLeft = '4px double black';
+                  template = template.substring(2);
+                } else if (col == 0 && template.startsWith('|')) {
+                  el.style.borderLeft = '1px solid black';
+                  template = template.substring(1);
+                }
+                if (template[0] == 'c') {
+                  el.style.textAlign = 'center';
+                } else if (template[0] == 'r') {
+                  el.style.textAlign = 'right';
+                }
+                template = template.substring(1);
+                if (template == '||') {
+                  el.style.borderRight = '4px double black';
+                } else if (template == '|') {
+                  el.style.borderRight = '1px solid black';
+                }
+              } catch (e) {
+                throw {
+                  message: `syntax error: wrong multicolumn argument '${template}'`
+                }
+              }
+            } else {
+              cells[col].push(el);
+
+              col++;
+              if (col == cells.length) {
+                col = 0
+              }
             }
           } else {
             col = 0
