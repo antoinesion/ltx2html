@@ -49,7 +49,7 @@ function CustomGenerator(customArgs, customPrototype) {
         }
 
         // tabular
-        args['tabular'] = ['V', 'hg', 'h']
+        args['tabular'] = ['V', 'g', 'h']
         prototype['tabular'] = function (template, content) {
           let tabular = document.createElement('div');
           tabular.classList.add('tabular');
@@ -98,7 +98,7 @@ function CustomGenerator(customArgs, customPrototype) {
           }
 
           tabular.dataset.template = template;
-          let cell = document.createElement('span');
+          let cell = document.createElement('div');
           cell.classList.add('cell');
           if (content) {
             cell.appendChild(content);
@@ -129,7 +129,7 @@ function CustomGenerator(customArgs, customPrototype) {
         // hline
         args['hline'] = ['V', 'h']
         prototype['hline'] = function (content) {
-          let cell = document.createElement('span');
+          let cell = document.createElement('div');
           cell.classList.add('cell');
           if (content) {
             cell.appendChild(content);
@@ -143,10 +143,11 @@ function CustomGenerator(customArgs, customPrototype) {
         // endline
         args['endline'] = ['V', 'h']
         prototype['endline'] = function (content) {
-          let endline = document.createElement('span');
+          console.log(content);
+          let endline = document.createElement('div');
           endline.classList.add('endline');
 
-          let cell = document.createElement('span');
+          let cell = document.createElement('div');
           cell.classList.add('cell');
           if (content) {
             cell.appendChild(content);
@@ -159,7 +160,7 @@ function CustomGenerator(customArgs, customPrototype) {
         // nextcell
         args['nextcell'] = ['V', 'h']
         prototype['nextcell'] = function (content) {
-          let cell = document.createElement('span');
+          let cell = document.createElement('div');
           cell.classList.add('cell');
           if (content) {
             cell.appendChild(content);
@@ -371,7 +372,6 @@ function ltx2html(latex, parentElement, generator = basicGenerator) {
         depth++;
       } else {
         depth--;
-        console.log(i, depth, firstStart);
         if (depth == 0 && firstStart) {
           tabularLatex = setTabularMacros(latex.substring(firstStart, e));
           latex = latex.substring(0, firstStart) + tabularLatex + latex.substring(e);
