@@ -309,50 +309,79 @@ function ltx2html(latex, parentElement, generator = basicGenerator) {
     }
 
     // tabular
-    i = 0;
-    while(latex.includes('\\begin{tabular}{', i)) {
-      let b = latex.indexOf('}{', i)+2;
-      let e = b,
-          stack = 0;
-      while((stack > 0 || latex[e] != '}') && e < latex.length) {
-        if (latex[e] == '{') {
-          stack++;
-        } else if (latex[e] == '}') {
-          stack--;
+    function setTabularMacros(latex) {
+      console.log(latex);
+      let mathMode = false;
+      for (let i = 0; i < latex.length; i++) {
+        if (latex[i] == '$') {
+          mathMode = !mathMode;
         }
-        e++;
-      }
-      if (e == latex.length) {
-        break;
-      }
-      let args = latex.substring(b, e);
-      
-      let j = args.indexOf('p');
-      while (j > -1) {
-        args = args.substring(0, j) + '\\pcell' + args.substring(j+1);
-        j = args.indexOf('p', j+2);
-      }
-      while (args.includes('*')) {
-        args = args.replace('*', '\\repeatcell');
-      }
-
-      latex = latex.substring(0, b) + args + latex.substring(e);
-      i = e;
-    }
-
-    let mathMode = false;
-    for (let i = 0; i < latex.length; i++) {
-      if (latex[i] == '$') {
-        mathMode = !mathMode;
-      }
-      if (!mathMode && latex[i] == '&') {
-        latex = latex.substring(0, i) + '\\nextcell ' + latex.substring(i+1);
-      } else if (i < latex.length - 1) {
-        if (latex[i] == '\\' && latex[i+1] == '\\') {
-          latex = latex.substring(0, i) + '\\endline ' + latex.substring(i+2);
+        if (!mathMode && latex[i] == '&') {
+          latex = latex.substring(0, i) + '\\nextcell ' + latex.substring(i+1);
+        } else if (i < latex.length - 1) {
+          if (latex[i] == '\\' && latex[i+1] == '\\') {
+            latex = latex.substring(0, i) + '\\endline ' + latex.substring(i+2);
+          }
         }
       }
+      return latex;
     }
+
+    i = 0; depth = 0;
+    let firstStart;
+    while(latex.includes('\\begin{tabular}', i) || latex.includes('\\end{tabular}', i)) {
+      let b = latex.indexOf('\\begin{tabular}', i),
+          e = latex.indexOf('\\end{tabular}', i);
+      if ((b > -1 && e > -1 && b < e) || (b > -1 && e == -1)) {
+        if (latex.indexOf('\\begin{tabular}{', i) == b) {
+          let argsStart = latex.indexOf('}{', i)+2;
+          let argsEnd = argsStart,
+              stack = 0;
+          while((stack > 0 || latex[argsEnd] != '}') && argsEnd < latex.length) {
+            if (latex[argsEnd] == '{') {
+              stack++;
+            } else if (latex[argsEnd] == '}') {
+              stack--;
+            }
+            argsEnd++;
+          }
+          if (argsEnd == latex.length) {
+            break;
+          }
+          let args = latex.substring(argsStart, argsEnd);
+          
+          let j = args.indexOf('p');
+          while (j > -1) {
+            args = args.substring(0, j) + '\\pcell' + args.substring(j+1);
+            j = args.indexOf('p', j+2);
+          }
+          while (args.includes('*')) {
+            args = args.replace('*', '\\repeatcell');
+          }
+    
+          latex = latex.substring(0, argsStart) + args + latex.substring(argsEnd);
+          i = argsStart + args.length;
+          
+          if (depth == 0) {
+            firstStart = i+1;
+          }
+        } else {
+          i = b + 1;
+        }
+        depth++;
+      } else {
+        depth--;
+        console.log(i, depth, firstStart);
+        if (depth == 0 && firstStart) {
+          tabularLatex = setTabularMacros(latex.substring(firstStart, e));
+          latex = latex.substring(0, firstStart) + tabularLatex + latex.substring(e);
+          i = firstStart + tabularLatex.length + 1;
+        } else {
+          i = e + 1;
+        }
+      }
+    }
+    console.log(latex);
 
     const ltx = `\\documentclass{article}
 
@@ -373,6 +402,7 @@ ${latex}
       generator = latexjs.parse(ltx, { generator: generator });
     }
     catch (e) {
+      console.log(e);
       // return error
       let line = e.location.end.line > 9 ? e.location.end.line - 9 : 0;
       line = e.location.start.line > 9 ? e.location.start.line - 9 : line;
