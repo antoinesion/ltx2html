@@ -183,8 +183,7 @@ function removeArgs(latex, command, linesup = 0) {
         endOfLine = latex.indexOf('\n', i+command.length);
     if (e == -1 || e > endOfLine) {
       throw {
-        message: `syntax error: missing end of arguments '${end}'`,
-        line: linesup + latex.substring(0, endOfLine).split('\n').length
+        message: `syntax error: missing end of arguments '${end}'`
       }
     }
     latex = latex.substring(0,i+command.length) + latex.substring(e+1);
@@ -207,8 +206,7 @@ function ltxclean(latex) {
           endOfLine = latex.indexOf('\n', begin);
       if (end == -1 || end > endOfLine) {
         throw {
-          message: `syntax error: missing end of arguments ']'`,
-          line: latex.substring(0, endOfLine).split('\n').length
+          message: `syntax error: missing end of arguments ']'`
         }
       }
       let args = latex.substring(begin+1, end);
@@ -422,11 +420,8 @@ ${latex}
     catch (e) {
       console.log(e);
       // return error
-      let line = e.location.end.line > 9 ? e.location.end.line - 9 : 0;
-      line = e.location.start.line > 9 ? e.location.start.line - 9 : line;
       throw {
         message: e.message,
-        line: line,
       }
     }
 
