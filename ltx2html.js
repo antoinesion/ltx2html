@@ -49,7 +49,7 @@ function CustomGenerator(customArgs, customPrototype) {
         }
 
         // tabular
-        args['tabular'] = ['V', 'g', 'h']
+        args['tabular'] = ['V', 'g', 'g']
         prototype['tabular'] = function (template, content) {
           let tabular = document.createElement('div');
           tabular.classList.add('tabular');
@@ -127,7 +127,7 @@ function CustomGenerator(customArgs, customPrototype) {
         }
 
         // hline
-        args['hline'] = ['V', 'h']
+        args['hline'] = ['V', 'g']
         prototype['hline'] = function (content) {
           let cell = document.createElement('div');
           cell.classList.add('cell');
@@ -141,9 +141,8 @@ function CustomGenerator(customArgs, customPrototype) {
         }
 
         // endline
-        args['endline'] = ['V', 'h']
+        args['endline'] = ['V', 'g']
         prototype['endline'] = function (content) {
-          console.log(content);
           let endline = document.createElement('div');
           endline.classList.add('endline');
 
@@ -158,7 +157,7 @@ function CustomGenerator(customArgs, customPrototype) {
         }
 
         // nextcell
-        args['nextcell'] = ['V', 'h']
+        args['nextcell'] = ['V', 'g']
         prototype['nextcell'] = function (content) {
           let cell = document.createElement('div');
           cell.classList.add('cell');
@@ -311,17 +310,32 @@ function ltx2html(latex, parentElement, generator = basicGenerator) {
 
     // tabular
     function setTabularMacros(latex) {
-      console.log(latex);
+      let i = 0;
+      while (latex.includes('\\hline', i)) {
+        let h = latex.indexOf('\\hline', i);
+        latex = latex.substring(0,h) + '}\\hline{' + latex.substring(h+6);
+        i = h + 2;
+      }
+
       let mathMode = false;
       for (let i = 0; i < latex.length; i++) {
         if (latex[i] == '$') {
           mathMode = !mathMode;
         }
-        if (!mathMode && latex[i] == '&') {
-          latex = latex.substring(0, i) + '\\nextcell ' + latex.substring(i+1);
-        } else if (i < latex.length - 1) {
-          if (latex[i] == '\\' && latex[i+1] == '\\') {
-            latex = latex.substring(0, i) + '\\endline ' + latex.substring(i+2);
+
+        if (!mathMode) {
+          if (latex[i] == '&') {
+          latex = latex.substring(0, i) + '}\\nextcell{' + latex.substring(i+1);
+          } else if (latex[i] == '\n' && (i == 0 || i == latex.length - 1)) {
+            latex = latex.substring(0, i) + latex.substring(i+1);
+          } else if (i < latex.length - 1) {
+            if (latex[i] == '\\' && latex[i+1] == '\\') {
+              latex = latex.substring(0, i) + '}\\endline{' + latex.substring(i+2);
+            } else if (latex[i] == '{' && (latex[i+1] === ' ' || latex[i+1] === '\n')) {
+              latex = latex.substring(0, i+1) + latex.substring(i+2);
+            } else if ((latex[i+1] === ' ' || latex[i+1] === '\n') && latex[i+1] == '}') {
+              latex = latex.substring(0, i) + latex.substring(i+1);
+            }
           }
         }
       }
@@ -350,6 +364,9 @@ function ltx2html(latex, parentElement, generator = basicGenerator) {
             break;
           }
           let args = latex.substring(argsStart, argsEnd);
+          while (args.includes(' ')) {
+            args = args.replace(' ', '');
+          }
           
           let j = args.indexOf('p');
           while (j > -1) {
@@ -359,12 +376,12 @@ function ltx2html(latex, parentElement, generator = basicGenerator) {
           while (args.includes('*')) {
             args = args.replace('*', '\\repeatcell');
           }
-    
-          latex = latex.substring(0, argsStart) + args + latex.substring(argsEnd);
-          i = argsStart + args.length;
+          
+          latex = latex.substring(0, argsStart) + args + '}{' +latex.substring(argsEnd+1);
+          i = argsStart + args.length + 2;
           
           if (depth == 0) {
-            firstStart = i+1;
+            firstStart = i;
           }
         } else {
           i = b + 1;
@@ -372,16 +389,17 @@ function ltx2html(latex, parentElement, generator = basicGenerator) {
         depth++;
       } else {
         depth--;
+        latex = latex.substring(0,e) + '}' + latex.substring(e);
+
         if (depth == 0 && firstStart) {
           tabularLatex = setTabularMacros(latex.substring(firstStart, e));
           latex = latex.substring(0, firstStart) + tabularLatex + latex.substring(e);
-          i = firstStart + tabularLatex.length + 1;
+          i = firstStart + tabularLatex.length + 2;
         } else {
-          i = e + 1;
+          i = e + 2;
         }
       }
     }
-    console.log(latex);
 
     const ltx = `\\documentclass{article}
 
