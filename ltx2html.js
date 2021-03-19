@@ -341,21 +341,22 @@ function ltx2html(latex, parentElement, generator = basicGenerator) {
         if (!mathMode) {
           if (latex[i] == '&') {
           latex = latex.substring(0, i) + '}\\nextcell{' + latex.substring(i+1);
-          i-=2;
+          i--;
           } else if (spaces.includes(latex[i]) && (i == 0 || i == latex.length - 1)) {
             latex = latex.substring(0, i) + latex.substring(i+1);
             i--;
           } else if (i < latex.length - 1) {
             if (latex[i] == '\\' && latex[i+1] == '\\') {
               latex = latex.substring(0, i) + '}\\endline{' + latex.substring(i+2);
-              i-=2;
+              i--;
             } else if (latex[i] == '{' && spaces.includes(latex[i+1])) {
               latex = latex.substring(0, i+1) + latex.substring(i+2);
               i--;
-            } else if (spaces.includes(latex[i]) && (spaces.includes(latex[i+1]) || latex[i+1] == '}')) {
-              latex = latex.substring(0, i) + latex.substring(i+1);
-              i--;
             }
+          }
+          if (i > 0 && spaces.includes(latex[i-1]) && (spaces.includes(latex[i]) || latex[i] == '}')) {
+            latex = latex.substring(0, i-1) + latex.substring(i);
+            i-=2;
           }
         }
       }
