@@ -35,7 +35,7 @@ function CustomGenerator(customArgs, customPrototype) {
         // CUSTOM MACROS
 
         // minipage
-        args['minipage'] = ['V', 'i?', 'g']
+        args['minipage'] = ['V', 'k?', 'k'];
         prototype['minipage'] = function (adjustment, width) {
           width = width.data;
 
@@ -54,7 +54,7 @@ function CustomGenerator(customArgs, customPrototype) {
         }
 
         // fbox
-        args['fbox'] = ['V', 'g']
+        args['fbox'] = ['V', 'g'];
         prototype['fbox'] = function (content) {
           let fbox = document.createElement('div');
           fbox.classList.add('hbox');
@@ -63,8 +63,23 @@ function CustomGenerator(customArgs, customPrototype) {
           return [fbox];
         }
 
+        // table
+        args['table'] = ['V'];
+        prototype['table'] = function () {
+          let tabCounter = this.g._counters.get('table');
+          if (tabCounter % 1 === 0) {
+            this.g._counters.set('table', tabCounter + 0.5);
+          }
+          this.g._counters.set('figure', parseInt(this.g._counters.get('figure')));
+
+          let table = document.createElement('div');
+          table.classList.add('table');
+
+          return [table];
+        }
+
         // tabular
-        args['tabular'] = ['V', 'g', 'g']
+        args['tabular'] = ['V', 'g', 'g'];
         prototype['tabular'] = function (template, content) {
           let tabular = document.createElement('div');
           tabular.classList.add('tabular');
@@ -74,9 +89,9 @@ function CustomGenerator(customArgs, customPrototype) {
             return [tabular]
           }
           if (template.childNodes.length > 0) {
-            template = template.childNodes[0].wholeText.replace(' ', '');
+            template = template.childNodes[0].wholeText;
           } else {
-            template = template.data.replace(' ', '');
+            template = template.data;
           }
 
           let gridTemplateColumns = '',
@@ -117,7 +132,7 @@ function CustomGenerator(customArgs, customPrototype) {
           return [tabular];
         }
 
-        args['repeatcell'] = ['H', 'n', 'g']
+        args['repeatcell'] = ['H', 'n', 'g'];
         prototype['repeatcell'] = function (number, column) {
           if (!column) {
             return []
@@ -125,7 +140,7 @@ function CustomGenerator(customArgs, customPrototype) {
           return [column.data.repeat(number)];
         }
 
-        args['pcell'] = ['H', 'g']
+        args['pcell'] = ['H', 'g'];
         prototype['pcell'] = function (length) {
           if (!length) {
             return []
@@ -135,13 +150,13 @@ function CustomGenerator(customArgs, customPrototype) {
         }
 
         // hline
-        args['hline'] = ['V', 'g']
+        args['hline'] = ['V', 'g'];
         prototype['hline'] = function (content) {
           return [document.createElement('hr'), createCell(content)];
         }
 
         // endline
-        args['endline'] = ['V', 'g']
+        args['endline'] = ['V', 'g'];
         prototype['endline'] = function (content) {
           let endline = document.createElement('div');
           endline.classList.add('endline');
@@ -149,20 +164,19 @@ function CustomGenerator(customArgs, customPrototype) {
         }
 
         // nextcell
-        args['nextcell'] = ['V', 'g']
+        args['nextcell'] = ['V', 'g'];
         prototype['nextcell'] = function(content) {
           return [createCell(content)];
         };
 
         // multicolumn
-        args['multicolumn'] = ['V', 'n', 'g', 'g']
+        args['multicolumn'] = ['V', 'n', 'k', 'g'];
         prototype['multicolumn'] = function (number, template, content) {
-          if (!template || !template.data) {
+          if (!template) {
             throw {
               message: `syntax error: wrong multicolumn argument '${template}'`
             }
           }
-          template = template.data;
 
           let cell = document.createElement('div');
           cell.classList.add('cell');
@@ -177,6 +191,67 @@ function CustomGenerator(customArgs, customPrototype) {
           }
 
           return [cell];
+        }
+
+        // figure
+        args['figure'] = ['V'];
+        prototype['figure'] = function () {
+          let figCounter = this.g._counters.get('figure');
+          if (figCounter % 1 === 0) {
+            this.g._counters.set('figure', figCounter + 0.5);
+          }
+          this.g._counters.set('table', parseInt(this.g._counters.get('table')));
+
+          let figure = document.createElement('div');
+          figure.classList.add('figure');
+
+          return [figure];
+        }
+
+        // includegraphics
+        args['includegraphics'] = ['V', 'kv?', 'u'];
+        prototype['includegraphics'] = function (option, url) {
+          let img = document.createElement('img');
+          img.src = url;
+
+          if (option && option.length > 0) {
+            img.style.display = 'none';
+            let [prop, val] = Object.entries(option[0])[0];
+            if (prop == 'width' || prop == 'height') {
+              if (val.includes('w')) {
+                val = parseFloat(val.split('w')[0])*100 + '%';
+              }
+              img.style.setProperty(prop, val);
+              img.style.removeProperty('display');
+            } else if (prop == 'scale') {
+              img.onload = function() {
+                this.style.width = this.width * val + 'px';
+                img.style.removeProperty('display');
+              }
+            }
+          }
+
+          return [img];
+        }
+
+        // caption
+        args['caption'] = ['V', 'g'];
+        prototype['caption'] = function(content) {
+          let caption = document.createElement('p');
+          caption.classList.add('caption');
+          caption.appendChild(content);
+
+          let figCounter = this.g._counters.get('figure'),
+              tabCounter = this.g._counters.get('table');
+          if (figCounter % 1 !== 0) {
+            caption.dataset.number = Math.ceil(figCounter);
+            this.g._counters.set('figure', figCounter + 1);
+          } else if (tabCounter % 1 !== 0) {
+            caption.dataset.number = Math.ceil(tabCounter);
+            this.g._counters.set('table', tabCounter + 1);
+          }
+
+          return [caption];
         }
     
         return CustomMacros;
@@ -255,6 +330,9 @@ function ltxclean(latex) {
     latex = latex.replace('\\textwidth', '\\linewidth');
   }
 
+  // figure
+  removeArgs(latex, '\\begin{figure}');
+
   return latex;
 }
 
@@ -285,6 +363,10 @@ function ltx2html(latex, parentElement, generator = basicGenerator) {
     // linewidth
     while (latex.includes('\\linewidth')) {
       latex = latex.replace('\\linewidth', 'w');
+    }
+    // textwidth
+    while (latex.includes('\\textwidth')) {
+      latex = latex.replace('\\textwidth', 'w');
     }
 
     // alphabetic enumerate
@@ -421,7 +503,6 @@ function ltx2html(latex, parentElement, generator = basicGenerator) {
         }
       }
     }
-    console.log(1, latex);
 
     const ltx = `\\documentclass{article}
 
