@@ -92,7 +92,9 @@ function createCell(content) {
   return cell;
 }
 
-function tikzpictureRequest(tikzpicture, DOMElement, tikzpictureOptions) {
+function tikzpictureRequest(tikzpicture, id, tikzpictureOptions) {
+  let container = document.querySelector(`.ltx #${id}`);
+
   let formdata = new FormData();
   formdata.append('tikzpicture', tikzpicture);
 
@@ -109,21 +111,21 @@ function tikzpictureRequest(tikzpicture, DOMElement, tikzpictureOptions) {
     if (xhr.readyState == XMLHttpRequest.DONE) {
       if (xhr.status == 200) {
         svg = fix(xhr.responseText);
-        DOMElement.outerHTML = svg;
+        container.innerHTML = svg;
         compiledTikz.set(tikzpicture, svg);
       } else {
-        DOMElement.classList.remove('loading');
-        DOMElement.src = path + 'img/error.svg';
-        DOMElement.title = xhr.responseText;
+        container.firstChild.classList.remove('loading');
+        container.firstChild.src = path + 'img/error.svg';
+        container.firstChild.title = xhr.responseText;
       }
     }
   };
 
   xhr.send(formdata);
 
-  DOMElement.src = path + 'img/loading.svg';
-  DOMElement.classList.add('loading');
-  DOMElement.title = 'loading';
+  container.firstChild.src = path + 'img/loading.svg';
+  container.firstChild.classList.add('loading');
+  container.firstChild.title = 'loading';
 }
 
 function CustomGenerator(customArgs, customPrototype) {
@@ -363,7 +365,9 @@ function CustomGenerator(customArgs, customPrototype) {
       // tikzpicture
       args['tikzpicture'] = ['V'];
       prototype['tikzpicture'] = function () {
-        let tickzpicture = this.g.tikzpictures[this.g.timeouts.length];
+        let number = this.g.timeouts.length;
+        let tickzpicture = this.g.tikzpictures[number],
+            id = `tikzpicture-${number}`;
         if (compiledTikz.has(tickzpicture)) {
           this.g.timeouts.push(null);
           return [htmlToElement(compiledTikz.get(tickzpicture))];
@@ -373,7 +377,10 @@ function CustomGenerator(customArgs, customPrototype) {
           let errorImg = document.createElement('img');
           errorImg.classList.add('tikzpicture');
           errorImg.src = path + 'img/error.svg';
-          return [errorImg];
+          let container = document.createElement('div');
+          container.classList.add('tikzpicture');
+          container.appendChild(errorImg);
+          return [container];
         }
 
         if (!this.g.tikzpictureOptions.waitingTime) {
@@ -383,24 +390,28 @@ function CustomGenerator(customArgs, customPrototype) {
           this.g.tikzpictureOptions.intervalTime = TIKZPICTURE_INTERVAL_TIME;
         }
 
-        let waitingImg = document.createElement('img');
-        waitingImg.classList.add('tikzpicture');
-        waitingImg.src = path + 'img/waiting.svg';
+        
         let waitingTime =
           this.g.tikzpictureOptions.waitingTime +
-          this.g.timeouts.length * this.g.tikzpictureOptions.intervalTime;
-        waitingImg.title = `waiting (${waitingTime / 1000}s without writing)`;
+          number * this.g.tikzpictureOptions.intervalTime;
 
         let tm = setTimeout(
           tikzpictureRequest,
           waitingTime,
           tickzpicture,
-          waitingImg,
+          id,
           this.g.tikzpictureOptions
         );
         this.g.timeouts.push(tm);
 
-        return [waitingImg];
+        let waitingImg = document.createElement('img');
+        waitingImg.src = path + 'img/waiting.svg';
+        waitingImg.title = `waiting (${waitingTime / 1000}s without writing)`;
+        let container = document.createElement('div');
+        container.classList.add('tikzpicture');
+        container.id = id;
+        container.appendChild(waitingImg);
+        return [container];
       };
 
       return CustomMacros;
