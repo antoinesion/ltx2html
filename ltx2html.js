@@ -447,60 +447,7 @@ function ltxclean(latex) {
   latex = removeArgs(latex, '\\begin{itemize}');
 
   // clean enumerate
-  var i = 0;
-  while (latex.includes('\\begin{enumerate}', i)) {
-    let begin = latex.indexOf('\\begin{enumerate}', i) + 17;
-    if (latex.indexOf('[', begin) == begin) {
-      let end = latex.indexOf(']', begin),
-        endOfLine = latex.indexOf('\n', begin);
-      if (end == -1 || end > endOfLine) {
-        throw {
-          message: `syntax error: missing end of arguments ']'`,
-        };
-      }
-      let args = latex.substring(begin + 1, end);
-      if (args.includes('label=\\alph*)')) {
-        latex =
-          latex.substring(0, begin) +
-          '[label=\\alph*)]' +
-          latex.substring(end + 1);
-        begin += 15;
-      } else {
-        latex = latex.substring(0, begin) + latex.substring(end + 1);
-      }
-    }
-
-    let depth = 1;
-    i = begin;
-    while (
-      (latex.includes('\\begin{enumerate}', i) ||
-        latex.includes('\\end{enumerate}', i)) &&
-      depth > 0
-    ) {
-      let b = latex.indexOf('\\begin{enumerate}', i),
-        e = latex.indexOf('\\end{enumerate}', i);
-      if ((b > -1 && e > -1 && b < e) || (b > -1 && e == -1)) {
-        i = b + 1;
-        depth++;
-      } else {
-        end = e;
-        i = e + 1;
-        depth--;
-      }
-    }
-
-    if (depth == 0) {
-      let sublatex = latex.substring(begin, end);
-      latex =
-        latex.substring(0, begin) +
-        removeArgs(
-          sublatex,
-          '\\begin{enumerate}',
-          latex.substring(0, begin).split('\n').length - 1
-        ) +
-        latex.substring(end);
-    }
-  }
+  latex = removeArgs(latex, '\\begin{enumerate}');
 
   // textwidth
   while (latex.includes('\\textwidth')) {
@@ -609,41 +556,6 @@ function ltx2html(
     // textwidth
     while (latex.includes('\\textwidth')) {
       latex = latex.replace('\\textwidth', 'w');
-    }
-
-    // alphabetic enumerate
-    i = 0;
-    depth = 0;
-    let alphEnumerate = false;
-    while (
-      latex.includes('\\begin{enumerate}', i) ||
-      latex.includes('\\end{enumerate}', i)
-    ) {
-      let b = latex.indexOf('\\begin{enumerate}', i),
-        e = latex.indexOf('\\end{enumerate}', i);
-      if ((b > -1 && e > -1 && b < e) || (b > -1 && e == -1)) {
-        if (depth == 0 && latex.indexOf('[label=\\alph*)]', b) == b + 17) {
-          latex =
-            latex.substring(0, b) +
-            '\\begin{enumerate}\\begin{enumerate}' +
-            latex.substring(b + 32);
-          alphEnumerate = true;
-          i = b + 18;
-        } else {
-          i = b + 1;
-        }
-        depth++;
-      } else {
-        if (depth == 1 && alphEnumerate) {
-          latex =
-            latex.substring(0, e) + '\\end{enumerate}' + latex.substring(e);
-          alphEnumerate = false;
-          i = e + 16;
-        } else {
-          i = e + 1;
-        }
-        depth--;
-      }
     }
 
     // tabular
@@ -807,11 +719,6 @@ ${latex}
     }
     while (child.innerHTML.includes('<br></p>')) {
       child.innerHTML = child.innerHTML.replace('<br></p>', '<br>&nbsp;</p>');
-    }
-
-    // remove first parenthesis in alphabetic enumerate
-    for (el of child.getElementsByClassName('itemlabel')) {
-      el.innerHTML = el.innerHTML.replace('(', '');
     }
 
     // minipage width inside fbox
