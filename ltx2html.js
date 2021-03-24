@@ -11,13 +11,6 @@ document.head.appendChild(latexjsScript);
 var basicGenerator = 'basicGenerator';
 var compiledTikz = new Map();
 
-function htmlToElement(html) {
-  var template = document.createElement('template');
-  html = html.trim();
-  template.innerHTML = html;
-  return template.content.firstChild;
-}
-
 function fix(svg) {
   var parser = new DOMParser();
   var xmlDoc = parser.parseFromString(svg, 'text/xml');
@@ -365,20 +358,23 @@ function CustomGenerator(customArgs, customPrototype) {
       // tikzpicture
       args['tikzpicture'] = ['V'];
       prototype['tikzpicture'] = function () {
+        let container = document.createElement('div');
+        container.classList.add('tikzpicture');
+
         let number = this.g.timeouts.length;
         let tickzpicture = this.g.tikzpictures[number],
             id = `tikzpicture-${number}`;
         if (compiledTikz.has(tickzpicture)) {
           this.g.timeouts.push(null);
-          return [htmlToElement(compiledTikz.get(tickzpicture))];
+          container.innerHTML = compiledTikz.get(tickzpicture);
+          return [container];
         }
 
         if (!this.g.tikzpictureOptions.url) {
           let errorImg = document.createElement('img');
           errorImg.classList.add('tikzpicture');
           errorImg.src = path + 'img/error.svg';
-          let container = document.createElement('div');
-          container.classList.add('tikzpicture');
+          
           container.appendChild(errorImg);
           return [container];
         }
@@ -407,8 +403,7 @@ function CustomGenerator(customArgs, customPrototype) {
         let waitingImg = document.createElement('img');
         waitingImg.src = path + 'img/waiting.svg';
         waitingImg.title = `waiting (${waitingTime / 1000}s without writing)`;
-        let container = document.createElement('div');
-        container.classList.add('tikzpicture');
+
         container.id = id;
         container.appendChild(waitingImg);
         return [container];
@@ -567,12 +562,6 @@ function ltx2html(
         latex = latex.substring(0, h) + '}\\hline{' + latex.substring(h + 6);
         i = h + 2;
       }
-      i = 0;
-      while (latex.includes('\\cline', i)) {
-        let c = latex.indexOf('\\cline', i);
-        latex = latex.substring(0, c) + '}\\cline{' + latex.substring(c + 6);
-        i = c + 2;
-      }
 
       let mathMode = false;
       for (let i = 0; i < latex.length; i++) {
@@ -623,9 +612,10 @@ function ltx2html(
     ) {
       let b = latex.indexOf('\\begin{tabular}', i),
         e = latex.indexOf('\\end{tabular}', i);
+      console.log(i, b, e, depth);
       if ((b > -1 && e > -1 && b < e) || (b > -1 && e == -1)) {
         if (latex.indexOf('\\begin{tabular}{', i) == b) {
-          let argsStart = latex.indexOf('}{', i) + 2;
+          let argsStart = latex.indexOf('}{', b) + 2;
           let argsEnd = argsStart,
             stack = 0;
           while (
@@ -671,6 +661,7 @@ function ltx2html(
         }
         depth++;
       } else {
+        console.log(depth);
         depth--;
         latex = latex.substring(0, e) + '}' + latex.substring(e);
 
@@ -684,6 +675,7 @@ function ltx2html(
         }
       }
     }
+    console.log(1, latex)
 
     const ltx = `\\documentclass{article}
 
@@ -830,7 +822,9 @@ ${latex}
 
     // DISPLAY
     parentElement.innerHTML = '';
-    parentElement.classList.add('ltx');
+    if (!parentElement.classList.contains('ltx')) {
+      parentElement.classList.add('ltx');
+    }
     parentElement.appendChild(child);
   }
 }
