@@ -766,9 +766,7 @@ window.addEventListener('resize', _autoresizeTabulars);
 function ltx2html(
   latex,
   parentElement,
-  options = {
-    generator: _basicGenerator,
-  }
+  options = {}
 ) {
   // DEFAULT VALUES
   if (!options.tikzpicture) {
@@ -848,6 +846,13 @@ ${latex}
     parentElement.innerHTML = '';
     if (!parentElement.classList.contains('ltx')) {
       parentElement.classList.add('ltx');
+    }
+    if (options.noindent != undefined && parentElement.classList.contains('noindent') != options.noindent) {
+      if (options.noindent) {
+        parentElement.classList.add('noindent');
+      } else {
+        parentElement.classList.remove('noindent');
+      }
     }
     parentElement.appendChild(body);
 
