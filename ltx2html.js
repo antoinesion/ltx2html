@@ -87,7 +87,6 @@ function _setTabularMacros(latex) {
         let trim = string.trim();
         latex = latex.substring(0, start) + trim + '}\\hline{' + latex.substring(i + 6);
         i = start + trim.length + 7; string = ''; start = i+1;
-        console.log(latex[i]);
       } else if (latex[i] == '&') {
         let trim = string.trim();
         latex = latex.substring(0, start) + trim + '}\\nextcell{' + latex.substring(i + 1);
@@ -754,13 +753,10 @@ function _autoresizeTabulars() {
     tab.style.removeProperty('height');
     let tabWidth = parseFloat(window.getComputedStyle(tab).width),
         parentWidth = parseFloat(window.getComputedStyle(tab.parentNode).width);
-    console.log(tabWidth, parentWidth);
     if (tabWidth > parentWidth) {
       let scale = parentWidth / tabWidth;
-      console.log(scale);
       tab.style.transform = `scale(${scale})`;
       let tabHeight = parseFloat(window.getComputedStyle(tab).height);
-      console.log(tabHeight * scale);
       tab.style.height = tabHeight * scale + 'px';
     }
   }
