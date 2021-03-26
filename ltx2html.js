@@ -746,6 +746,27 @@ function _postprocess(body) {
   }
 }
 
+function _autoresizeTabulars() {
+  let tabs = document.querySelectorAll('.ltx .tabular');
+
+  for (tab of tabs) {
+    tab.style.removeProperty('transform');
+    tab.style.removeProperty('height');
+    let tabWidth = parseFloat(window.getComputedStyle(tab).width),
+        parentWidth = parseFloat(window.getComputedStyle(tab.parentNode).width);
+    console.log(tabWidth, parentWidth);
+    if (tabWidth > parentWidth) {
+      let scale = parentWidth / tabWidth;
+      console.log(scale);
+      tab.style.transform = `scale(${scale})`;
+      let tabHeight = parseFloat(window.getComputedStyle(tab).height);
+      console.log(tabHeight * scale);
+      tab.style.height = tabHeight * scale + 'px';
+    }
+  }
+}
+window.addEventListener('resize', _autoresizeTabulars);
+
 function ltx2html(
   latex,
   parentElement,
@@ -833,6 +854,9 @@ ${latex}
       parentElement.classList.add('ltx');
     }
     parentElement.appendChild(body);
+
+    // auto resize tabulars
+    setTimeout(_autoresizeTabulars, 50);
   }
 }
 
