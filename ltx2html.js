@@ -1,5 +1,5 @@
-const TIKZPICTURE_WAITING_TIME = 3000;
-const TIKZPICTURE_INTERVAL_TIME = 1000;
+const TIKZPICTURE_DEFAULT_WAITING_TIME = 3000;
+const TIKZPICTURE_DEFAULT_INTERVAL_TIME = 1500;
 const SPACES = [' ', '\n', '\t'];
 
 var _scripts = document.getElementsByTagName('script');
@@ -73,52 +73,37 @@ function _guid() {
   );
 }
 
-// TODO: use String.prototype.trim() instead
 function _setTabularMacros(latex) {
-  let i = 0;
-  while (latex.includes('\\hline', i)) {
-    let h = latex.indexOf('\\hline', i);
-    latex = latex.substring(0, h) + '}\\hline{' + latex.substring(h + 6);
-    i = h + 2;
-  }
-
-  let mathMode = false;
+  let mathMode = false,
+      start = 0,
+      string = '';
   for (let i = 0; i < latex.length; i++) {
     if (latex[i] == '$') {
       mathMode = !mathMode;
     }
 
     if (!mathMode) {
-      if (latex[i] == '&') {
-        latex =
-          latex.substring(0, i) + '}\\nextcell{' + latex.substring(i + 1);
-        i--;
-      } else if (
-        SPACES.includes(latex[i]) &&
-        (i == 0 || i == latex.length - 1)
-      ) {
-        latex = latex.substring(0, i) + latex.substring(i + 1);
-        i--;
-      } else if (i < latex.length - 1) {
-        if (latex[i] == '\\' && latex[i + 1] == '\\') {
-          latex =
-            latex.substring(0, i) + '}\\endline{' + latex.substring(i + 2);
-          i--;
-        } else if (latex[i] == '{' && SPACES.includes(latex[i + 1])) {
-          latex = latex.substring(0, i + 1) + latex.substring(i + 2);
-          i--;
-        }
+      if (latex.substring(i, i+6) == '\\hline') {
+        let trim = string.trim();
+        latex = latex.substring(0, start) + trim + '}\\hline{' + latex.substring(i + 6);
+        i = start + trim.length + 7; string = ''; start = i+1;
+        console.log(latex[i]);
+      } else if (latex[i] == '&') {
+        let trim = string.trim();
+        latex = latex.substring(0, start) + trim + '}\\nextcell{' + latex.substring(i + 1);
+        i = start + trim.length + 10; string = ''; start = i+1;
+      } else if (i < latex.length - 1 && latex[i] == '\\' && latex[i + 1] == '\\') {
+        let trim = string.trim();
+        latex = latex.substring(0, start) + trim + '}\\endline{' + latex.substring(i + 2);
+        i = start + trim.length + 9; string = ''; start = i+1;
+      } else {
+        string += latex[i];
       }
-      if (
-        i > 0 &&
-        SPACES.includes(latex[i - 1]) &&
-        (SPACES.includes(latex[i]) || latex[i] == '}')
-      ) {
-        latex = latex.substring(0, i - 1) + latex.substring(i);
-        i -= 2;
-      }
+    } else {
+      string += latex[i];
     }
   }
+  latex = latex.substring(0, start) + string.trim();
   return latex;
 }
 
@@ -772,16 +757,16 @@ function ltx2html(
   if (!options.tikzpicture) {
     options.tikzpicture = {
       url: '',
-      waitingTime: TIKZPICTURE_WAITING_TIME,
-      intervalTime: TIKZPICTURE_INTERVAL_TIME,
+      waitingTime: TIKZPICTURE_DEFAULT_WAITING_TIME,
+      intervalTime: TIKZPICTURE_DEFAULT_INTERVAL_TIME,
       requestHeaders: {},
     }
   } else {
     if (!options.tikzpicture.waitingTime) {
-      options.tikzpicture.waitingTime = TIKZPICTURE_WAITING_TIME;
+      options.tikzpicture.waitingTime = TIKZPICTURE_DEFAULT_WAITING_TIME;
     }
     if (!options.tikzpicture.intervalTime) {
-      options.tikzpicture.intervalTime = TIKZPICTURE_INTERVAL_TIME;
+      options.tikzpicture.intervalTime = TIKZPICTURE_DEFAULT_INTERVAL_TIME;
     }
     if (!options.tikzpicture.requestHeaders) {
       options.tikzpicture.requestHeaders = {};
