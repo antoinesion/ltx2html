@@ -476,10 +476,6 @@ function _removeArgs(latex, command) {
 function ltxclean(latex) {
   // GOAL: remove arguments that cannot be processed
 
-
-  // clean itemize
-  latex = _removeArgs(latex, '\\begin{itemize}');
-
   // clean enumerate
   latex = _removeArgs(latex, '\\begin{enumerate}');
 
@@ -498,17 +494,60 @@ function ltxclean(latex) {
 }
 
 function _preprocess(latex, generator) {
-  // tikzpicture
+  // itemize
   let i = 0,
-    depth = 0,
-    tikzpictureStart;
+    labelStack = [];
+  while (
+    latex.includes('\\begin{itemize}', i) ||
+    latex.includes('\\end{itemize}', i) ||
+    (latex.includes('\\item ', i) && labelStack.length > 0)
+  ) {
+    let b = latex.indexOf('\\begin{itemize}', i),
+        e = latex.indexOf('\\end{itemize}', i),
+        t = labelStack.length > 0 ? latex.indexOf('\\item ', i) : -1;
+    if (b > -1 &&
+        ((e > -1 && t > -1 && b < e && b < t) ||
+        (e > -1 && t == -1 && b < e) ||
+        (e == -1 && t > - 1 && b < t) ||
+        (e == -1 && t == -1))) {
+      labelStack.push(null);
+      if (latex.indexOf('\\begin{itemize}[', i) == b) {
+        let argsStart = latex.indexOf('[', b) + 1,
+            argsEnd = latex.indexOf(']', b);
+        let args = latex.substring(argsStart, argsEnd);
+        if (args.startsWith('label=')) {
+          labelStack[labelStack.length - 1] = args.substring(6);
+          latex = latex.substring(0, argsStart - 1) + latex.substring(argsEnd + 1); 
+        }
+      }
+      i = b + 1;
+    } else if (e > 1 &&
+      ((b > -1 && t > -1 && e < b && e < t) ||
+        (b > -1 && t == -1 && e < b) ||
+        (b == -1 && t > - 1 && e < t) ||
+        (b == -1 && t == -1))) {
+      labelStack.pop();
+      i = e + 1;
+    } else {
+      let label = labelStack[labelStack.length - 1];
+      if (label != null && latex.indexOf('\\item[', i) != t) {
+        latex = latex.substring(0, t) + `\\item[${label}]` + latex.substring(t+5);
+      }
+      i = t + 1;
+    }
+  }
+
+  // tikzpicture
+  i = 0;
+  let depth = 0,
+      tikzpictureStart;
   while (
     latex.includes('\\begin{tikzpicture}', i) ||
     latex.includes('\\end{tikzpicture}', i)
   ) {
     let b = latex.indexOf('\\begin{tikzpicture}', i),
-      e = latex.indexOf('\\end{tikzpicture}', i);
-    if ((b > -1 && e > -1 && b < e) || (b > -1 && e == -1)) {
+        e = latex.indexOf('\\end{tikzpicture}', i);
+    if (b > -1 && ((e > -1 && b < e) || e == -1)) {
       if (depth == 0) {
         tikzpictureStart = b;
         depth++;
@@ -572,8 +611,8 @@ function _preprocess(latex, generator) {
     latex.includes('\\end{tabular}', i)
   ) {
     let b = latex.indexOf('\\begin{tabular}', i),
-      e = latex.indexOf('\\end{tabular}', i);
-    if ((b > -1 && e > -1 && b < e) || (b > -1 && e == -1)) {
+        e = latex.indexOf('\\end{tabular}', i);
+    if (b > -1 && ((e > -1 && b < e) || e == -1)) {
       if (latex.indexOf('\\begin{tabular}{', i) == b) {
         let argsStart = latex.indexOf('}{', b) + 2;
         let argsEnd = argsStart,
