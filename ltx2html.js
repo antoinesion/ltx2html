@@ -514,6 +514,11 @@ function _preprocess(latex, generator) {
       if (latex.indexOf('\\begin{itemize}[', i) == b) {
         let argsStart = latex.indexOf('[', b) + 1,
             argsEnd = latex.indexOf(']', b);
+        if (argsEnd == -1) {
+          throw {
+            message: "syntax error: missing end of arguments ']'",
+          };
+        }
         let args = latex.substring(argsStart, argsEnd);
         if (args.startsWith('label=')) {
           labelStack[labelStack.length - 1] = args.substring(6);
